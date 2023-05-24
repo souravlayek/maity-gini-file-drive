@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  server:
+    build: .
+    ports:
+      - "8000:8080"
+    environment:
+      ENDPOINT: file.codevizon.com
+      MONGO_URI: mongodb://192.168.0.71:27017
