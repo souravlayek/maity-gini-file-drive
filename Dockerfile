@@ -1,46 +1,35 @@
-FROM golang:1.17-alpine AS builder
+# Use an official Golang runtime as a parent image
+FROM golang:1.16-alpine
 
-# Set necessary environmet variables needed for our image
-ENV GO111MODULE=on \
-    CGO_ENABLED=0 \
-    GOOS=linux \
-    GOARCH=amd64
+# Set the working directory to /go/src/app
+WORKDIR /go/src/app
 
-# Move to working directory /build
-WORKDIR /build
-
-# Copy the code into the container
+# Copy the current directory contents into the container at /go/src/app
 COPY . .
 
-# Install necessary dependencies
+# Install required packages for building sqlite driver
+RUN apk add git gcc musl-dev
+
+# Download dependencies
 RUN go mod download
 
-# Build the application
-RUN go build -o main ./cmd/server/
+# Build the Go app
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 GOARM=7 go build -ldflags="-s -w" -o /go/bin/app cmd/server/main.go
 
-# Move to /dist directory as the place for resulting binary folder
-WORKDIR /dist
-
-# Copy binary from build to main folder
-RUN cp /build/main .
-
-# Export necessary port
-EXPOSE 8080
-
-# Command to run when starting the container
-CMD ["/dist/main"]
-
-# Start a new stage from scratch
+# Use an official Alpine Linux image as a parent image
 FROM alpine:latest
 
-# Install ca-certificates
-RUN apk --no-cache add ca-certificates
+# Install SQLite
+RUN apk add ca-certificates sqlite
 
-# Set working directory
-WORKDIR /root/
+# Set the working directory to /app
+WORKDIR /app
 
-# Copy the Pre-built binary file from the previous stage
-COPY --from=builder /dist/main .
+# Copy the binary from the first stage
+COPY --from=0 /go/bin/app .
 
-# Command to run when starting the container
-CMD ["./main", "server"]
+# Expose port 8000 for the Go app to listen on
+EXPOSE 8000
+
+# Start the Go app
+CMD ["./app", "server"]
